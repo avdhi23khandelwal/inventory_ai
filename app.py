@@ -13,15 +13,10 @@ st.set_page_config(page_title="Agentic AI Inventory", page_icon="🤖", layout="
 # Initialize DB
 init_db()
 
-# --- Auto-Refresh Logic (Every 5 seconds) ---
+# --- Session State Initialization ---
 if 'last_refresh' not in st.session_state:
     st.session_state.last_refresh = time.time()
     st.session_state.agent_status = "Idle"
-
-current_time = time.time()
-if current_time - st.session_state.last_refresh > 5:
-    st.session_state.last_refresh = current_time
-    st.rerun() # Forces app to reload every 5s to simulate live feed
 
 # --- Sidebar & Navigation ---
 with st.sidebar:
@@ -35,15 +30,21 @@ with st.sidebar:
     
     st.markdown("---")
     
-    page = st.selectbox("Navigate", [
-        "Command Center", 
-        "Inventory Overview", 
-        "Demand Forecasting", 
-        "Purchase Orders", 
-        "Returns & Refunds",
-        "Logistics",
-        "Agent Logs"
-    ])
+    # Save page state to prevent reset on rerun
+    if 'page' not in st.session_state:
+        st.session_state.page = "Command Center"
+    
+    # Find index to keep selection persistent
+    pages = ["Command Center", "Inventory Overview", "Demand Forecasting", "Purchase Orders", "Returns & Refunds", "Logistics", "Agent Logs"]
+    current_index = pages.index(st.session_state.page)
+    
+    page = st.selectbox(
+        "Navigate", 
+        pages, 
+        index=current_index,
+        key="nav_selectbox"
+    )
+    st.session_state.page = page # Update state on change
     
     st.markdown("---")
     st.subheader("Agent Control")
@@ -87,9 +88,9 @@ if page == "Command Center":
     col3.metric("Low Stock Alerts", low_stock, delta_color="inverse")
     col4.metric("System Health", "98%")
     
-    # Activity Feed (Auto-Updates)
+    # Activity Feed
     st.markdown("---")
-    st.subheader("🕒 Agent Activity Feed (Live)")
+    st.subheader("🕒 Agent Activity Feed")
     logs = db.query(AgentLog).order_by(AgentLog.timestamp.desc()).limit(5).all()
     
     for log in logs:
@@ -101,12 +102,11 @@ elif page == "Inventory Overview":
     st.header("📦 Inventory Overview")
     st.caption("Per-channel stock levels across your entire catalog.")
     
-    # Filters
     col1, col2 = st.columns(2)
     with col1:
-        category = st.selectbox("Category", ["All Categories", "Electronics", "Mobile", "Accessories"])
+        st.selectbox("Category", ["All Categories", "Electronics", "Mobile", "Accessories"], key="cat_select")
     with col2:
-        channel = st.selectbox("Channel", ["All Channels", "Amazon", "Flipkart", "Myntra", "Website"])
+        st.selectbox("Channel", ["All Channels", "Amazon", "Flipkart", "Myntra", "Website"], key="chan_select")
     
     data = db.query(Inventory, Product).join(Product, Inventory.sku == Product.sku).all()
     
@@ -131,23 +131,19 @@ elif page == "Demand Forecasting":
     
     sku_select = st.selectbox("Select SKU for Analysis", [p.sku for p in db.query(Product).all()])
     
-    # Fetch History
     history = db.query(SalesHistory).filter(SalesHistory.sku == sku_select).order_by(SalesHistory.date).all()
     
     if not history:
         st.warning("No forecast data yet. Run the AI Cycle first.")
     else:
-        # Create DataFrame for Chart
         hist_df = pd.DataFrame([{'Date': h.date, 'Actual Sales': h.quantity, 'Forecast': h.forecasted_demand} for h in history])
         
-        # Line Chart
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=hist_df['Date'], y=hist_df['Actual Sales'], mode='lines+markers', name='Actual Sales'))
         fig.add_trace(go.Scatter(x=hist_df['Date'], y=hist_df['Forecast'], mode='lines+markers', name='AI Forecast', line=dict(dash='dash')))
         fig.update_layout(title=f"Sales vs Forecast: {sku_select}", xaxis_title="Date", yaxis_title="Units")
         st.plotly_chart(fig, use_container_width=True)
         
-        # Recommendation
         st.markdown("---")
         st.subheader("🤖 AI Recommendation")
         latest_actual = hist_df.iloc[-1]['Actual Sales']
@@ -161,7 +157,6 @@ elif page == "Demand Forecasting":
 elif page == "Returns & Refunds":
     st.header("↩️ Returns & Refunds")
     
-    # Stats Row
     col1, col2 = st.columns(2)
     pending = db.query(Returns).filter(Returns.status == "Pending").count()
     processed = db.query(Returns).filter(Returns.status == "Processed").count()
@@ -174,7 +169,6 @@ elif page == "Returns & Refunds":
     
     st.markdown("---")
     
-    # Split Layout
     left_col, right_col = st.columns([2, 1])
     
     with left_col:
@@ -185,7 +179,6 @@ elif page == "Returns & Refunds":
         
     with right_col:
         st.subheader("Return Reasons")
-        # Dummy Data for Chart (Group by reason logic would go here)
         reason_counts = {'Damaged': 5, 'Wrong Item': 2, 'Late Delivery': 1}
         fig = px.pie(values=list(reason_counts.values()), names=list(reason_counts.keys()), hole=0.4)
         st.plotly_chart(fig, use_container_width=True)
