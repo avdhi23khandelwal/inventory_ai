@@ -53,12 +53,20 @@ def init_db():
         Product(sku='IPH-15-PRO', name='iPhone 15 Pro', price=999.00, supplier='Apple'),
         Product(sku='GAM-MOUS', name='Logitech G502', price=49.99, supplier='Logitech'),
         Product(sku='SAMSUNG-S24', name='Samsung S24', price=799.00, supplier='Samsung'),
+        Product(sku='MAC-PRO-14', name='MacBook Pro 14', price=1999.00, supplier='Apple'),
+        Product(sku='NIK-Z9', name='Nikon Z9 Camera', price=5499.00, supplier='Nikon'),
+        Product(sku='ALEXA-DOT', name='Alexa Dot 5', price=49.00, supplier='Amazon'),
+        Product(sku='AIR-PODS', name='AirPods Pro 2', price=249.00, supplier='Apple'),
     ]
     inventory = [
         Inventory(sku='WH-1000XM5', total_stock=150, amazon_stock=50, flipkart_stock=50, warehouse='Zone-A'),
         Inventory(sku='IPH-15-PRO', total_stock=12, amazon_stock=4, flipkart_stock=4, warehouse='Zone-B'), # Low Stock
         Inventory(sku='GAM-MOUS', total_stock=300, amazon_stock=100, flipkart_stock=100, warehouse='Zone-A'),
         Inventory(sku='SAMSUNG-S24', total_stock=85, amazon_stock=30, flipkart_stock=30, warehouse='Zone-B'),
+        Inventory(sku='MAC-PRO-14', total_stock=45, amazon_stock=15, flipkart_stock=15, shopify_stock=15, warehouse='Zone-A'),
+        Inventory(sku='NIK-Z9', total_stock=5, amazon_stock=1, flipkart_stock=2, shopify_stock=2, warehouse='Zone-B'),
+        Inventory(sku='ALEXA-DOT', total_stock=200, amazon_stock=70, flipkart_stock=70, shopify_stock=60, warehouse='Zone-A'),
+        Inventory(sku='AIR-PODS', total_stock=90, amazon_stock=30, flipkart_stock=30, shopify_stock=30, warehouse='Zone-A'),
     ]
     db.add_all(products)
     db.add_all(inventory)
