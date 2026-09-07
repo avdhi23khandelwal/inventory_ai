@@ -3,6 +3,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import random
 from datetime import datetime
+
 DATABASE_URL = "sqlite:///inventory.db"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -27,7 +28,7 @@ class Inventory(Base):
     website_stock = Column(Integer)
     total_stock = Column(Integer)
     reorder_point = Column(Integer)
-    status = Column(String) # Healthy, Low, Critical
+    status = Column(String)
     warehouse = Column(String)
 
 class PurchaseOrder(Base):
@@ -53,8 +54,8 @@ class Returns(Base):
     order_id = Column(String)
     sku = Column(String)
     channel = Column(String)
-    reason = Column(String) # Damaged, Wrong Item, etc.
-    status = Column(String) # Pending, Processed
+    reason = Column(String)
+    status = Column(String)
     created_at = Column(DateTime)
 
 class SalesHistory(Base):
@@ -72,21 +73,30 @@ def init_db():
     if db.query(Product).first():
         return
     
+    # 8 Products
     products = [
         Product(sku='WH-1000XM5', name='Sony Headphones', price=348.00, supplier='Sony'),
         Product(sku='IPH-15-PRO', name='iPhone 15 Pro', price=999.00, supplier='Apple'),
         Product(sku='GAM-MOUS', name='Logitech G502', price=49.99, supplier='Logitech'),
         Product(sku='SAMSUNG-S24', name='Samsung S24', price=799.00, supplier='Samsung'),
+        Product(sku='MAC-PRO-14', name='MacBook Pro 14', price=1999.00, supplier='Apple'),
+        Product(sku='NIK-Z9', name='Nikon Z9 Camera', price=5499.00, supplier='Nikon'),
+        Product(sku='ALEXA-DOT', name='Alexa Dot 5', price=49.00, supplier='Amazon'),
+        Product(sku='AIR-PODS', name='AirPods Pro 2', price=249.00, supplier='Apple'),
     ]
     
+    # Corresponding Inventory
     inventory = [
         Inventory(sku='WH-1000XM5', total_stock=150, amazon_stock=50, flipkart_stock=50, myntra_stock=30, website_stock=20, reorder_point=40, status="Healthy", warehouse='Zone-A'),
         Inventory(sku='IPH-15-PRO', total_stock=12, amazon_stock=4, flipkart_stock=4, myntra_stock=2, website_stock=2, reorder_point=20, status="Critical", warehouse='Zone-B'),
         Inventory(sku='GAM-MOUS', total_stock=300, amazon_stock=100, flipkart_stock=100, myntra_stock=50, website_stock=50, reorder_point=80, status="Healthy", warehouse='Zone-A'),
         Inventory(sku='SAMSUNG-S24', total_stock=85, amazon_stock=30, flipkart_stock=30, myntra_stock=15, website_stock=10, reorder_point=50, status="Low", warehouse='Zone-B'),
+        Inventory(sku='MAC-PRO-14', total_stock=45, amazon_stock=15, flipkart_stock=15, myntra_stock=10, website_stock=5, reorder_point=20, status="Low", warehouse='Zone-A'),
+        Inventory(sku='NIK-Z9', total_stock=5, amazon_stock=1, flipkart_stock=2, myntra_stock=1, website_stock=1, reorder_point=10, status="Critical", warehouse='Zone-B'),
+        Inventory(sku='ALEXA-DOT', total_stock=200, amazon_stock=70, flipkart_stock=70, myntra_stock=30, website_stock=30, reorder_point=100, status="Healthy", warehouse='Zone-A'),
+        Inventory(sku='AIR-PODS', total_stock=90, amazon_stock=30, flipkart_stock=30, myntra_stock=15, website_stock=15, reorder_point=40, status="Healthy", warehouse='Zone-A'),
     ]
-    
-    # Seed some returns
+
     returns = [
         Returns(order_id='ORD-991', sku='WH-1000XM5', channel='Amazon', reason='Damaged Packaging', status='Processed', created_at=datetime.utcnow()),
         Returns(order_id='ORD-992', sku='IPH-15-PRO', channel='Flipkart', reason='Wrong Item', status='Pending', created_at=datetime.utcnow()),
@@ -96,7 +106,7 @@ def init_db():
     db.add_all(inventory)
     db.add_all(returns)
     db.commit()
-    print("Database seeded!")
+    print("Database seeded with 8 SKUs!")
     db.close()
 
 def get_db():
