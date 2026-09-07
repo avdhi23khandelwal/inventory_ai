@@ -30,8 +30,8 @@ def refresh_data():
 with st.sidebar:
     st.title("🤖 Agentic AI")
     st.markdown("---")
-    
-    page = st.selectbox("Navigate", ["Command Center", "Inventory Map", "Purchase Orders", "Agent Logs"])
+
+    page = st.sidebar.selectbox("Navigate", ["Command Center", "Inventory Map", "Demand Forecast", "Purchase Orders", "Logistics", "Agent Logs"])
     
     st.markdown("---")
     st.subheader("Agent Control")
@@ -95,7 +95,7 @@ elif page == "Inventory Map":
     df = pd.DataFrame(df_data)
     
     # Interactive Bar Chart
-    fig = px.bar(df, x="SKU", y=["Amazon", "Flipkart"], barmode="group", title="Stock by Channel")
+    fig = px.bar(df, x="SKU", y=["Amazon", "Flipkart", "Shopify"], barmode="group", title="Stock by Channel")
     st.plotly_chart(fig, use_container_width=True)
     
     # Data Table
