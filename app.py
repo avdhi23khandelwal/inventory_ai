@@ -224,6 +224,7 @@ try:
                 st.plotly_chart(fig, use_container_width=True)
 
     # ============ Logistics (NEW) ============
+        # ============ Logistics (NEW) ============
     elif page == "Logistics":
         st.header("🚚 Logistics")
         st.caption("Inbound shipments from suppliers. The Restock Agent auto-delivers any shipment past its ETA.")
@@ -234,4 +235,20 @@ try:
         st.markdown("---")
         st.subheader("Active Shipments")
         shipments = db.query(Shipment).order_by(Shipment.created_at.desc()).all()
-        ship_data = [{"Shipment ID": s.shipment_id, "SKU": s.sku, "Qty
+        ship_data = []
+        for s in shipments:
+            eta_str = s.eta.strftime("%Y-%m-%d %H:%M") if s.eta else "-"
+            ship_data.append({
+                "Shipment ID": s.shipment_id,
+                "SKU": s.sku,
+                "Qty": s.qty,
+                "Carrier": s.carrier,
+                "Tracking": s.tracking_id,
+                "Status": s.status,
+                "ETA": eta_str,
+            })
+        st.dataframe(pd.DataFrame(ship_data), use_container_width=True)
+        if st.button("Run Restock Agent Now", type="primary"):
+            delivered = agents.restock_agent(db)
+            st.success(f"Delivered {delivered} shipments.")
+            st.rerun()
