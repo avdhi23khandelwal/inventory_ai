@@ -147,9 +147,17 @@ try:
     # ============================================================
     # Inventory Overview
     # ============================================================
+    
+        # ============================================================
+    # Inventory Overview
+    # ============================================================
     elif page == "Inventory Overview":
         st.header("📦 Inventory Overview")
         st.caption("Per-channel stock levels across your entire catalog.")
+
+        # Read filter values from session state (with defaults)
+        cat_filter = st.session_state.get("cat_select", "All Categories")
+        chan_filter = st.session_state.get("chan_select", "All Channels")
 
         col1, col2 = st.columns(2)
         with col1:
@@ -165,14 +173,40 @@ try:
                 key="chan_select",
             )
 
-        data = db.query(Inventory, Product).join(
+        # Re-read after widget interaction (Streamlit reruns the script)
+        cat_filter = st.session_state.get("cat_select", "All Categories")
+        chan_filter = st.session_state.get("chan_select", "All Channels")
+
+        # Build the base query
+        query = db.query(Inventory, Product).join(
             Product, Inventory.sku == Product.sku
-        ).all()
+        )
+
+        # Apply Category filter
+        if cat_filter != "All Categories":
+            query = query.filter(Product.category == cat_filter)
+
+        # Apply Channel filter — when a specific channel is selected,
+        # only show SKUs that actually have stock (>0) in that channel.
+        channel_column_map = {
+            "Amazon": Inventory.amazon_stock,
+            "Flipkart": Inventory.flipkart_stock,
+            "Myntra": Inventory.myntra_stock,
+            "Website": Inventory.website_stock,
+        }
+        if chan_filter != "All Channels":
+            chan_col = channel_column_map[chan_filter]
+            query = query.filter(chan_col > 0)
+
+        data = query.all()
+
+        # Build dataframe
         df_data = []
         for inv, prod in data:
             df_data.append({
                 "Product": prod.name,
                 "SKU": inv.sku,
+                "Category": prod.category,
                 "Amazon": inv.amazon_stock,
                 "Myntra": inv.myntra_stock,
                 "Flipkart": inv.flipkart_stock,
@@ -181,23 +215,36 @@ try:
                 "Reorder Pt": inv.reorder_point,
                 "Status": inv.status,
             })
-        df = pd.DataFrame(df_data)
 
-        def _status_color(val):
-            # Dark-theme-friendly colors
-            if val == "Critical":
-                return "background-color: #7f1d1d; color: #fecaca; font-weight: bold"
-            if val == "Low":
-                return "background-color: #78350f; color: #fde68a; font-weight: bold"
-            if val == "Healthy":
-                return "background-color: #14532d; color: #bbf7d0; font-weight: bold"
-            return ""
+        if not df_data:
+            st.info(
+                f"No products match the selected filters "
+                f"(Category: **{cat_filter}**, Channel: **{chan_filter}**)."
+            )
+        else:
+            df = pd.DataFrame(df_data)
 
-        st.dataframe(
-            df.style.map(_status_color, subset=["Status"]),
-            use_container_width=True,
-        )
+            # Show filter summary
+            st.caption(
+                f"Showing {len(df)} of {db.query(Inventory).count()} SKUs "
+                f"• Category: **{cat_filter}** • Channel: **{chan_filter}**"
+            )
 
+            def _status_color(val):
+                # Dark-theme-friendly colors
+                if val == "Critical":
+                    return "background-color: #7f1d1d; color: #fecaca; font-weight: bold"
+                if val == "Low":
+                    return "background-color: #78350f; color: #fde68a; font-weight: bold"
+                if val == "Healthy":
+                    return "background-color: #14532d; color: #bbf7d0; font-weight: bold"
+                return ""
+
+            st.dataframe(
+                df.style.map(_status_color, subset=["Status"]),
+                use_container_width=True,
+                hide_index=True,
+            )
     # ============================================================
     # Demand Forecasting
     # ============================================================
