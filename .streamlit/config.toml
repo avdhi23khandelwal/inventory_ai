@@ -5,7 +5,3 @@ backgroundColor="#0f172a"
 secondaryBackgroundColor="#1e293b"
 textColor="#f1f5f9"
 font="sans serif"
-def _status_color(val):
-    if val == "Critical": return "background-color: #ffcccc"   # light pink
-    if val == "Low":      return "background-color: #ffe9b3"   # light orange
-    if val == "Healthy":  return "background-color: #ccffcc"   # light green
