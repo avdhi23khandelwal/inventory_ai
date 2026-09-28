@@ -132,10 +132,10 @@ try:
             })
         df = pd.DataFrame(df_data)
         def _status_color(val):
-            if val == "Critical": return "background-color: #ffcccc"
-            if val == "Low": return "background-color: #ffe9b3"
-            if val == "Healthy": return "background-color: #ccffcc"
-            return ""
+             if val == "Critical": return "background-color: #7f1d1d; color: #fecaca; font-weight: bold"
+             if val == "Low": return "background-color: #78350f; color: #fde68a; font-weight: bold"
+             if val == "Healthy": return "background-color: #14532d; color: #bbf7d0; font-weight: bold"
+             return ""
         st.dataframe(df.style.map(_status_color, subset=["Status"]), use_container_width=True)
 
     # ============ Demand Forecasting ============
