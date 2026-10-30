@@ -19,6 +19,9 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+import os
+if os.path.exists("inventory.db"):
+    os.remove("inventory.db")
 init_db()
 
 # --- Session state ---
