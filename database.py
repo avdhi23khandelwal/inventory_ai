@@ -130,32 +130,42 @@ class AuditTrail(Base):
 
 
 Base.metadata.create_all(bind=engine)
-
 def init_db():
     """
-    Initializes the database. If the old schema is detected
-    (inventory table exists but suppliers table doesn't), drops
-    and recreates all tables for a clean re-seed.
+    Initializes the database. If products don't exist (meaning the DB is
+    empty OR in a partial state from a failed seed), wipes everything
+    and re-seeds fresh. This handles all edge cases:
+    - Old schema (no suppliers table)
+    - Partial state (suppliers exist but products don't)
+    - Completely empty DB
     """
     from sqlalchemy import inspect
 
-    # Detect schema mismatch: if 'inventory' exists but 'suppliers' doesn't,
-    # we're running against an old DB that needs to be wiped.
-    inspector = inspect(engine)
-    existing_tables = inspector.get_table_names()
+    # First, make sure ALL tables exist (creates any missing ones)
+    Base.metadata.create_all(bind=engine)
 
-    if "inventory" in existing_tables and "suppliers" not in existing_tables:
-        print("Old schema detected — dropping all tables for re-seed...")
-        Base.metadata.drop_all(bind=engine)
-        Base.metadata.create_all(bind=engine)
-        print("All tables recreated with new schema.")
+    # Check if DB is already fully seeded (products exist)
+    check_db = SessionLocal()
+    try:
+        products_exist = check_db.query(Product).first() is not None
+    except Exception:
+        # If the query itself fails (schema mismatch), force a wipe
+        products_exist = False
+    finally:
+        check_db.close()
+
+    # If products exist, DB is seeded — nothing to do.
+    if products_exist:
+        return
+
+    # Otherwise, wipe EVERYTHING and recreate fresh.
+    # This handles: old schema, partial state, empty DB, schema mismatch.
+    print("Database not fully seeded — wiping and re-creating fresh...")
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
 
     db = SessionLocal()
     try:
-        # If products already exist, assume DB is seeded — skip.
-        if db.query(Product).first():
-            return
-
         # ---- Suppliers ----
         suppliers = [
             Supplier(name="Sony", contact_email="sales@sony.com", phone="+1-555-0101", lead_time_days=10, on_time_rate=0.97, quality_rate=0.99),
@@ -166,7 +176,7 @@ def init_db():
             Supplier(name="Amazon", contact_email="vendor@amazon.com", phone="+1-555-0106", lead_time_days=3, on_time_rate=0.99, quality_rate=0.95),
         ]
         db.add_all(suppliers)
-        db.commit()  # commit instead of flush — safer, releases the lock
+        db.commit()
 
         # ---- Products ----
         products = [
@@ -228,6 +238,7 @@ def init_db():
                        timestamp=datetime.utcnow()),
         ]
 
+        # Add everything in one transaction
         db.add_all(products)
         db.add_all(inventory)
         db.add_all(sales)
@@ -236,6 +247,10 @@ def init_db():
         db.add_all(audit)
         db.commit()
         print("Database seeded: 8 SKUs, 6 suppliers, 30d sales, 4 returns, 3 shipments.")
+    except Exception as e:
+        db.rollback()
+        print(f"Seeding failed: {e}")
+        raise
     finally:
         db.close()
 
