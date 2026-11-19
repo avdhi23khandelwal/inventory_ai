@@ -7,25 +7,28 @@ from datetime import datetime, timedelta
 from contextlib import contextmanager
 import random
 
-# Try the default DB file. If it's read-only or locked, fall back to a fresh file.
-DB_FILE = "inventory.db"
+# ---------------------------------------------------------------------------
+# Database file location — use a WRITABLE directory.
+# On Streamlit Cloud, /mount/src/ (where the code lives) is read-only.
+# The home directory (~) is always writable.
+# ---------------------------------------------------------------------------
+DB_DIR = os.path.expanduser("~")  # /home/adminuser on Streamlit Cloud
+DB_FILE = os.path.join(DB_DIR, "inventory.db")
 
-def _get_writable_db_url():
-    """Return a SQLite URL pointing to a writable database file."""
-    global DB_FILE
-    # If the file exists, check if we can write to it
-    if os.path.exists(DB_FILE):
-        try:
-            # Try opening for append to test writability
-            with open(DB_FILE, "a") as f:
-                pass
-        except (PermissionError, OSError):
-            # File exists but is read-only — use a new timestamped filename
-            DB_FILE = f"inventory_{int(time.time())}.db"
-            print(f"Old DB was read-only — using new file: {DB_FILE}")
-    return f"sqlite:///{DB_FILE}"
+# If an old read-only inventory.db exists in the CWD, ignore it — use the home dir.
+# If the home dir DB also exists but is read-only (very rare), use a timestamped name.
+if os.path.exists(DB_FILE):
+    try:
+        # Test if we can write to it
+        with open(DB_FILE, "a") as f:
+            pass
+    except (PermissionError, OSError):
+        DB_FILE = os.path.join(DB_DIR, f"inventory_{int(time.time())}.db")
+        print(f"Old DB was read-only — using new file: {DB_FILE}")
 
-DATABASE_URL = _get_writable_db_url()
+DATABASE_URL = f"sqlite:///{DB_FILE}"
+print(f"Database location: {DB_FILE}")
+
 engine = create_engine(
     DATABASE_URL,
     connect_args={"check_same_thread": False},
