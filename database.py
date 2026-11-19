@@ -131,13 +131,32 @@ class AuditTrail(Base):
 
 Base.metadata.create_all(bind=engine)
 
-
 def init_db():
+    """
+    Initializes the database. If the old schema is detected
+    (inventory table exists but suppliers table doesn't), drops
+    and recreates all tables for a clean re-seed.
+    """
+    from sqlalchemy import inspect
+
+    # Detect schema mismatch: if 'inventory' exists but 'suppliers' doesn't,
+    # we're running against an old DB that needs to be wiped.
+    inspector = inspect(engine)
+    existing_tables = inspector.get_table_names()
+
+    if "inventory" in existing_tables and "suppliers" not in existing_tables:
+        print("Old schema detected — dropping all tables for re-seed...")
+        Base.metadata.drop_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
+        print("All tables recreated with new schema.")
+
     db = SessionLocal()
     try:
+        # If products already exist, assume DB is seeded — skip.
         if db.query(Product).first():
             return
 
+        # ---- Suppliers ----
         suppliers = [
             Supplier(name="Sony", contact_email="sales@sony.com", phone="+1-555-0101", lead_time_days=10, on_time_rate=0.97, quality_rate=0.99),
             Supplier(name="Apple", contact_email="b2b@apple.com", phone="+1-555-0102", lead_time_days=14, on_time_rate=0.95, quality_rate=0.99),
@@ -147,8 +166,9 @@ def init_db():
             Supplier(name="Amazon", contact_email="vendor@amazon.com", phone="+1-555-0106", lead_time_days=3, on_time_rate=0.99, quality_rate=0.95),
         ]
         db.add_all(suppliers)
-        db.flush()
+        db.commit()  # commit instead of flush — safer, releases the lock
 
+        # ---- Products ----
         products = [
             Product(sku='WH-1000XM5',  name='Sony Headphones',  category='Electronics', price=348.00,  cost=240.00, supplier='Sony',     lead_time_days=10),
             Product(sku='IPH-15-PRO',  name='iPhone 15 Pro',    category='Mobile',      price=999.00,  cost=720.00, supplier='Apple',    lead_time_days=14),
@@ -160,6 +180,7 @@ def init_db():
             Product(sku='AIR-PODS',    name='AirPods Pro 2',    category='Accessories', price=249.00,  cost=170.00, supplier='Apple',    lead_time_days=14),
         ]
 
+        # ---- Inventory ----
         inventory = [
             Inventory(sku='WH-1000XM5',  total_stock=150, amazon_stock=50, flipkart_stock=50, myntra_stock=30, website_stock=20, reorder_point=40,  status="Healthy",  warehouse='Zone-A'),
             Inventory(sku='IPH-15-PRO',  total_stock=12,  amazon_stock=4,  flipkart_stock=4,  myntra_stock=2,  website_stock=2,  reorder_point=20,  status="Critical", warehouse='Zone-B'),
@@ -171,6 +192,7 @@ def init_db():
             Inventory(sku='AIR-PODS',    total_stock=90,  amazon_stock=30, flipkart_stock=30, myntra_stock=15, website_stock=15, reorder_point=40,  status="Healthy",  warehouse='Zone-A'),
         ]
 
+        # ---- Sales history (30 days back) ----
         sales = []
         base_date = datetime.now() - timedelta(days=30)
         for p in products:
@@ -184,6 +206,7 @@ def init_db():
                 forecast = int(qty * 1.05)
                 sales.append(SalesHistory(sku=p.sku, date=d.date().isoformat(), quantity=qty, forecasted_demand=forecast))
 
+        # ---- Returns ----
         returns = [
             Returns(order_id='ORD-991', sku='WH-1000XM5',  channel='Amazon',   reason='Damaged Packaging', status='Processed', created_at=datetime.utcnow()),
             Returns(order_id='ORD-992', sku='IPH-15-PRO',  channel='Flipkart', reason='Wrong Item',        status='Pending',   created_at=datetime.utcnow()),
@@ -191,12 +214,14 @@ def init_db():
             Returns(order_id='ORD-994', sku='SAMSUNG-S24', channel='Website',  reason='Defective Unit',    status='Processed', created_at=datetime.utcnow() - timedelta(days=5)),
         ]
 
+        # ---- Shipments ----
         shipments = [
             Shipment(shipment_id='SHP-5001', po_id=None, sku='WH-1000XM5',  qty=100, carrier='FedEx',  tracking_id='FX-001', status='In Transit', eta=datetime.utcnow() + timedelta(days=3), created_at=datetime.utcnow() - timedelta(days=2)),
             Shipment(shipment_id='SHP-5002', po_id=None, sku='NIK-Z9',      qty=10,  carrier='DHL',    tracking_id='DHL-002', status='Delayed',    eta=datetime.utcnow() + timedelta(days=14), created_at=datetime.utcnow() - timedelta(days=5)),
             Shipment(shipment_id='SHP-5003', po_id=None, sku='AIR-PODS',    qty=60,  carrier='UPS',    tracking_id='UPS-003', status='Delivered',  eta=datetime.utcnow() - timedelta(days=1), created_at=datetime.utcnow() - timedelta(days=6)),
         ]
 
+        # ---- Audit trail ----
         audit = [
             AuditTrail(actor="system", action="INIT", entity="Database", entity_id="-",
                        before="", after="Seeded 8 SKUs, 6 suppliers, 30d sales history",
@@ -213,6 +238,7 @@ def init_db():
         print("Database seeded: 8 SKUs, 6 suppliers, 30d sales, 4 returns, 3 shipments.")
     finally:
         db.close()
+
 
 
 # FIX: original `finally: pass` leaked every session.
