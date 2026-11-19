@@ -1,3 +1,5 @@
+import os
+import time
 from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -5,10 +7,44 @@ from datetime import datetime, timedelta
 from contextlib import contextmanager
 import random
 
-DATABASE_URL = "sqlite:///inventory.db"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False}, pool_pre_ping=True)
+# Try the default DB file. If it's read-only or locked, fall back to a fresh file.
+DB_FILE = "inventory.db"
+
+def _get_writable_db_url():
+    """Return a SQLite URL pointing to a writable database file."""
+    global DB_FILE
+    # If the file exists, check if we can write to it
+    if os.path.exists(DB_FILE):
+        try:
+            # Try opening for append to test writability
+            with open(DB_FILE, "a") as f:
+                pass
+        except (PermissionError, OSError):
+            # File exists but is read-only — use a new timestamped filename
+            DB_FILE = f"inventory_{int(time.time())}.db"
+            print(f"Old DB was read-only — using new file: {DB_FILE}")
+    return f"sqlite:///{DB_FILE}"
+
+DATABASE_URL = _get_writable_db_url()
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    pool_pre_ping=True,
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
+#from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, Boolean
+#from sqlalchemy.ext.declarative import declarative_base
+#from sqlalchemy.orm import sessionmaker
+#from datetime import datetime, timedelta
+#from contextlib import contextmanager
+#import random
+
+#DATABASE_URL = "sqlite:///inventory.db"
+#engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False}, pool_pre_ping=True)
+#SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+#Base = declarative_base()
 
 
 # ---------- Models ----------
