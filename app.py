@@ -20,8 +20,24 @@ st.set_page_config(
 )
 
 import os
-if os.path.exists("inventory.db"):
-    os.remove("inventory.db")
+import time
+
+# Force-delete any existing read-only inventory.db
+DB_FILE = "inventory.db"
+if os.path.exists(DB_FILE):
+    try:
+        os.chmod(DB_FILE, 0o777)  # try to make it writable first
+        os.remove(DB_FILE)
+        print("Deleted old inventory.db")
+    except Exception as e:
+        print(f"Could not delete old DB: {e}")
+        # If we can't delete it, use a new filename so we get a fresh writable DB
+        global DATABASE_URL
+        import database
+        new_db = f"inventory_{int(time.time())}.db"
+        database.engine = None  # force re-creation
+        os.environ["FORCE_NEW_DB"] = new_db
+
 init_db()
 
 # --- Session state ---
